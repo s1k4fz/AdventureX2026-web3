@@ -2,11 +2,11 @@ import { useAuth } from '@/features/auth/useAuth'
 
 /**
  * Check if the current user has the admin role.
- * Reads from the Supabase session JWT's app_metadata.role field.
+ * Demo mode: every logged-in user is treated as admin (mirrors the backend
+ * override in core/security.py). Restore the app_metadata.role check when
+ * leaving demo mode.
  */
 export function useIsAdmin(): boolean {
   const { session } = useAuth()
-  if (!session?.user) return false
-  const appMetadata = session.user.app_metadata
-  return appMetadata?.role === 'admin'
+  return Boolean(session?.user)
 }

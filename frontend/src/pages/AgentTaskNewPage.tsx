@@ -1,26 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { ArrowUpRight, Shield } from 'lucide-react'
+import { Shield } from 'lucide-react'
 
-import type { AgentInputPayload } from '@/components/AgentInput'
-import { ConversationInput } from '@/features/conversation/ConversationInput'
+import { Spinner } from '@/components/ui/spinner'
 import { useCreateAgentTaskMutation } from '@/features/agent/agentApi'
+import { PolicyCreateForm } from '@/features/policy-create/PolicyCreateForm'
 import { NeedsStage } from '@/features/policy-journey/stages/NeedsStage'
-
-const SUGGESTED_PROMPTS = [
-  {
-    title: '利率路径对冲',
-    body: '担心美联储年内降息次数不及预期，想对冲利率路径风险',
-  },
-  {
-    title: '能源地缘风险',
-    body: '担心地缘冲突升级影响能源价格，希望用预测市场做保护',
-  },
-  {
-    title: '大选宏观波动',
-    body: '想对冲大选结果不确定带来的宏观波动',
-  },
-]
 
 interface AgentTaskLaunchState {
   agentTaskLaunch?: {
@@ -28,39 +13,67 @@ interface AgentTaskLaunchState {
     displayText?: string
     clientRequestId: string
   }
+  /** 首页紧凑入口带来的需求描述草稿，预填工作台表单。 */
+  draftNeedText?: string
+}
+
+/** 创建失败 / 刷新后可恢复的草稿（sessionStorage，会话级）。 */
+const DRAFT_STORAGE_KEY = 'xengine.policy-create-draft'
+
+function readStoredDraft(): string {
+  try {
+    return sessionStorage.getItem(DRAFT_STORAGE_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function writeStoredDraft(text: string) {
+  try {
+    if (text.trim()) sessionStorage.setItem(DRAFT_STORAGE_KEY, text)
+    else sessionStorage.removeItem(DRAFT_STORAGE_KEY)
+  } catch {
+    // 隐私模式等存储不可用时静默降级，不阻断创建流程。
+  }
 }
 
 export function AgentTaskNewPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const [draft, setDraft] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const initialLaunch = (location.state as AgentTaskLaunchState | null)
-    ?.agentTaskLaunch
+  const routeState = location.state as AgentTaskLaunchState | null
+  const initialLaunch = routeState?.agentTaskLaunch
+  const [draftNeedText, setDraftNeedText] = useState(
+    () => routeState?.draftNeedText ?? readStoredDraft()
+  )
   const [launch, setLaunch] = useState<
     AgentTaskLaunchState['agentTaskLaunch'] | null
   >(initialLaunch ?? null)
   const startedLaunchRef = useRef<string | null>(null)
+  // 重试同一目标时复用 clientRequestId，后端幂等不会产生重复任务。
+  const failedLaunchRef = useRef<{
+    goalText: string
+    clientRequestId: string
+  } | null>(null)
   const createTask = useCreateAgentTaskMutation()
 
   const begin = (goalText: string, displayText?: string) => {
     const text = goalText.trim()
     if (!text || createTask.isPending || launch) return
     setErrorMessage(null)
+    const reusableId =
+      failedLaunchRef.current?.goalText === text
+        ? failedLaunchRef.current.clientRequestId
+        : crypto.randomUUID()
     setLaunch({
       goalText: text,
       displayText: displayText ?? text,
-      clientRequestId: crypto.randomUUID(),
+      clientRequestId: reusableId,
     })
   }
 
-  const handleSend = (payload: AgentInputPayload) => {
-    begin(payload.content, payload.displayText)
-  }
-
-  // The launcher route is also used as an immediate handoff from home. Keep
-  // the create mutation here so its successful response pre-populates the
-  // task query cache before the live-workbench route mounts.
+  // Keep the create mutation here so its successful response pre-populates
+  // the task query cache before the live-workbench route mounts.
   useEffect(() => {
     if (!launch || startedLaunchRef.current === launch.clientRequestId) return
     startedLaunchRef.current = launch.clientRequestId
@@ -72,13 +85,23 @@ export function AgentTaskNewPage() {
         clientRequestId: launch.clientRequestId,
       })
       .then((task) => {
+        failedLaunchRef.current = null
+        writeStoredDraft('')
         navigate(`/tasks/${task.id}`, { replace: true })
       })
       .catch(() => {
-        setDraft(launch.displayText ?? launch.goalText)
+        failedLaunchRef.current = {
+          goalText: launch.goalText,
+          clientRequestId: launch.clientRequestId,
+        }
+        // 允许同一 clientRequestId 再次发起（幂等重试）。
+        startedLaunchRef.current = null
+        const draft = launch.displayText ?? launch.goalText
+        setDraftNeedText(draft)
+        writeStoredDraft(draft)
         setLaunch(null)
         setErrorMessage(
-          '创建任务失败，请重试。若持续失败，请确认后端已连接且已登录。'
+          '创建任务失败，请重试。若持续失败，请确认后端已连接且已登录。草稿已保留，刷新页面也不会丢失。'
         )
       })
   }, [createTask, launch, navigate])
@@ -86,24 +109,23 @@ export function AgentTaskNewPage() {
   if (launch) {
     return (
       <div className="units-conversation-page units-app-panel relative flex h-full min-h-0 flex-col overflow-hidden">
+        <div
+          role="status"
+          className="flex shrink-0 items-center gap-2 border-b border-[var(--units-stroke-color)] px-4 py-2.5"
+        >
+          <Spinner className="size-3.5 text-[var(--units-orange)]" />
+          <p className="text-[13px] font-medium text-foreground">
+            已提交，正在初始化工作台…
+          </p>
+          <p className="hidden text-[12px] text-muted-foreground sm:block">
+            问卷与市场检索会在工作台画布中推进
+          </p>
+        </div>
         <NeedsStage
           initialMessage={launch.displayText ?? launch.goalText}
           isGeneratingQuestionnaire
           stageStatus="loading"
         />
-        <div className="units-workspace-input-dock shrink-0 p-2.5 sm:p-3">
-          <div className="mx-auto w-full max-w-2xl">
-            <ConversationInput
-              value=""
-              onValueChange={() => undefined}
-              isStreaming
-              onSend={() => undefined}
-              onStop={() => undefined}
-              variant="home"
-              modeLabel="保障任务"
-            />
-          </div>
-        </div>
       </div>
     )
   }
@@ -111,62 +133,34 @@ export function AgentTaskNewPage() {
   return (
     <div className="units-conversation-page units-app-panel relative flex h-full min-h-0 flex-col overflow-hidden">
       <div className="scrollbar-fade min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center px-4 py-7 sm:px-5">
+        <div className="mx-auto w-full max-w-3xl px-4 py-7 sm:px-5">
           <div className="units-stage-enter max-w-xl">
             <span className="flex size-11 items-center justify-center rounded-xl bg-[var(--units-orange)] text-[var(--units-on-accent)]">
               <Shield className="size-5" />
             </span>
             <p className="mt-4 text-[10px] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
-              xEngine · 保障任务
+              xEngine · 新建保障工作台
             </p>
             <h2 className="font-display mt-1.5 text-2xl font-semibold tracking-tight">
-              先说清你担心什么
+              填写保障需求
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              问卷、市场检索与三档方案会出现在工作台画布。你直接操作产物，指令栏用来补充偏好。
+              描述担忧并勾选偏好，创建后工作台会依次推进问卷、市场检索与三档方案。
             </p>
           </div>
 
-          <div className="units-stagger mt-5 flex flex-col gap-2">
-            {errorMessage ? (
-              <p className="rounded-xl bg-[color-mix(in_srgb,var(--units-red)_10%,transparent)] px-3 py-2 text-sm text-[var(--units-red)]">
-                {errorMessage}
-              </p>
-            ) : null}
-            {SUGGESTED_PROMPTS.map((prompt) => (
-              <button
-                key={prompt.body}
-                type="button"
-                disabled={createTask.isPending}
-                onClick={() => begin(prompt.body)}
-                className="group flex items-center gap-3 rounded-xl bg-[var(--units-wash-strong)] px-3.5 py-3 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--units-black)_7%,transparent)] disabled:opacity-50"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[11px] font-semibold text-[var(--units-orange)]">
-                    {prompt.title}
-                  </span>
-                  <span className="mt-0.5 block text-[13px] leading-5">
-                    {prompt.body}
-                  </span>
-                </span>
-                <ArrowUpRight className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
-              </button>
-            ))}
+          <div className="units-stagger mt-6">
+            <PolicyCreateForm
+              key={draftNeedText}
+              initialNeedText={draftNeedText}
+              isSubmitting={createTask.isPending}
+              errorMessage={errorMessage}
+              onNeedTextChange={writeStoredDraft}
+              onSubmit={({ goalText, displayText }) =>
+                begin(goalText, displayText)
+              }
+            />
           </div>
-        </div>
-      </div>
-
-      <div className="units-workspace-input-dock shrink-0 p-2.5 sm:p-3">
-        <div className="mx-auto w-full max-w-2xl">
-          <ConversationInput
-            value={draft}
-            onValueChange={setDraft}
-            isStreaming={createTask.isPending}
-            onSend={handleSend}
-            onStop={() => undefined}
-            variant="home"
-            modeLabel="保障任务"
-          />
         </div>
       </div>
     </div>

@@ -19,6 +19,7 @@ import {
   PolicyJourneyShell,
   selectionErrorMessage,
 } from '@/features/policy-journey/PolicyJourneyShell'
+import { usePolicyJourneyContext } from '@/features/policy-journey/journeyContext'
 import { usePolicyJourneyState } from '@/features/policy-journey/usePolicyJourneyState'
 
 const BASIC_QUESTIONNAIRE: QuestionnaireQuestion[] = [
@@ -49,7 +50,18 @@ export function PolicyJourneyArtifact({
   policyId,
 }: ArtifactViewProps) {
   const navigate = useNavigate()
-  const { journey } = usePolicyJourneyState(task.id, policyId)
+  // Workbench mounts a shared provider; standalone embeds fall back to a
+  // local subscription. Both hooks are unconditional (rules of hooks); the
+  // fallback stays cheap because react-query dedupes the snapshot fetch.
+  const journeyCtx = usePolicyJourneyContext()
+  const localJourney = usePolicyJourneyState(
+    journeyCtx ? undefined : task.id,
+    journeyCtx ? undefined : policyId
+  )
+  const journey = journeyCtx?.journey ?? localJourney.journey
+  const reviewStage = journeyCtx?.focusedStage ?? null
+  const reviewing =
+    reviewStage != null && reviewStage !== journey.currentStage
 
   const writable = canSubmitApprovals(task.status)
   const intakeApproval = usePendingApproval(task, 'intake_answers')
@@ -146,6 +158,29 @@ export function PolicyJourneyArtifact({
     return payload?.portfolioId ?? null
   }, [task.approvals])
 
+  // Review mode: replay the submitted questionnaire answers so the readonly
+  // snapshot shows what was actually chosen, not the empty local draft.
+  const submittedAnswers = useMemo(() => {
+    const submitted = task.approvals.find(
+      (item) => item.kind === 'intake_answers' && item.status === 'submitted'
+    )
+    const response = submitted?.response as
+      | { answers?: PolicyIntakeAnswer[] }
+      | undefined
+    if (!response?.answers?.length) return null
+    const map: QuestionnaireAnswers = {}
+    for (const row of response.answers) map[row.questionId] = row.answer
+    return map
+  }, [task.approvals])
+
+  const displayJourney = useMemo(
+    () =>
+      reviewing && reviewStage
+        ? { ...journey, currentStage: reviewStage }
+        : journey,
+    [journey, reviewing, reviewStage]
+  )
+
   const submitError = submit.isError
     ? portfolioWritable
       ? selectionErrorMessage(submit.error)
@@ -155,24 +190,28 @@ export function PolicyJourneyArtifact({
   return (
     <PolicyJourneyShell
       fillHeight
+      reviewing={reviewing}
       title={view?.title ?? task.title}
       initialMessage={task.goalText}
-      journey={journey}
+      journey={displayJourney}
       taskId={task.id}
       taskStatus={task.status}
       questions={questions}
       factorCategories={factorCategories}
-      answers={answers}
+      answers={reviewing ? (submittedAnswers ?? answers) : answers}
       isSubmittingAnswers={submit.isPending}
       isGeneratingQuestionnaire={
-        !fallbackQuestions && !questionnaireReady && questions.length === 0
+        !reviewing &&
+        !fallbackQuestions &&
+        !questionnaireReady &&
+        questions.length === 0
       }
       errorMessage={
         submitError ??
         (policyQuery.isError ? '加载保单失败，请重试' : task.errorMessage)
       }
       onAnswerChange={
-        writable
+        writable && !reviewing
           ? (questionId, option) =>
               setAnswers((current) => ({
                 ...current,
@@ -180,8 +219,10 @@ export function PolicyJourneyArtifact({
               }))
           : undefined
       }
-      onApplyAnswers={writable ? setAnswers : undefined}
-      onSubmitAnswers={writable && approval ? onSubmitAnswers : undefined}
+      onApplyAnswers={writable && !reviewing ? setAnswers : undefined}
+      onSubmitAnswers={
+        writable && !reviewing && approval ? onSubmitAnswers : undefined
+      }
       onRetryGenerate={() => {
         setFallbackQuestions(null)
         void policyQuery.refetch()
@@ -192,7 +233,9 @@ export function PolicyJourneyArtifact({
         setAnswers({})
       }}
       onSelectPortfolio={
-        portfolioWritable || Boolean(policyId) ? onSelectPortfolio : undefined
+        !reviewing && (portfolioWritable || Boolean(policyId))
+          ? onSelectPortfolio
+          : undefined
       }
       selecting={submit.isPending}
       selectedPortfolioId={selectedPortfolioId}

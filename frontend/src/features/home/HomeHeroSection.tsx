@@ -1,9 +1,6 @@
-import { ChevronDown } from 'lucide-react'
+import { ArrowRight, ChevronDown } from 'lucide-react'
 
-import {
-  AgentInput,
-  type AgentInputPayload,
-} from '@/components/AgentInput'
+import { Button } from '@/components/ui/button'
 import type { HomeDashboardStats } from '@/features/home/HomeDashboardMetrics'
 
 interface PromptHint {
@@ -47,8 +44,8 @@ const FLOW_STEPS = [
 interface HomeHeroSectionProps {
   draft: string
   onDraftChange: (value: string) => void
-  onSendTask: (payload: AgentInputPayload) => void
-  taskError?: string | null
+  /** 携需求描述进入新建保障工作台（空串 = 直接进入空表单）。 */
+  onEnterWorkbench: (needText: string) => void
   stats: HomeDashboardStats
   formattedCoverage: string
   onBrowsePanel: () => void
@@ -58,8 +55,7 @@ interface HomeHeroSectionProps {
 export function HomeHeroSection({
   draft,
   onDraftChange,
-  onSendTask,
-  taskError,
+  onEnterWorkbench,
   stats,
   formattedCoverage,
   onBrowsePanel,
@@ -83,7 +79,11 @@ export function HomeHeroSection({
       <div className="units-stagger relative w-full max-w-2xl space-y-6 pb-16 pt-10">
         <div className="space-y-3 text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-[var(--units-stroke-color)] bg-background/80 px-3 py-1 text-[11px] font-semibold tracking-[0.12em] text-muted-foreground">
-            <img src="/logo.svg" alt="" className="size-4 rounded-[4px]" />
+            <img
+              src="/brand-logo-without-bg.png"
+              alt=""
+              className="size-4 object-contain"
+            />
             xEngine · 差分机
           </span>
           <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-foreground sm:text-3xl">
@@ -91,25 +91,32 @@ export function HomeHeroSection({
             <span className="text-[var(--units-orange)]">变成链上保障</span>
           </h1>
           <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
-            描述你的担忧，Agent 会生成风险问卷、检索预测市场，并编排三档可签约的保障方案。
+            在工作台填写保障需求，系统会生成风险问卷、检索预测市场，并编排三档可签约的保障方案。
           </p>
         </div>
 
-        <div>
-          <AgentInput
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            onEnterWorkbench(draft.trim())
+          }}
+          className="flex items-center gap-2 rounded-2xl border border-[var(--units-stroke-color)] bg-background/90 p-2 pl-4 shadow-none focus-within:border-[var(--units-stroke-strong)]"
+        >
+          <input
             value={draft}
-            variant="home"
-            onValueChange={onDraftChange}
-            onSend={onSendTask}
-            placeholder="描述你的担忧，例如：担心美联储降息预期落空…"
-            modeLabel="风险 Agent"
+            onChange={(event) => onDraftChange(event.target.value)}
+            placeholder="一句话描述你的担忧，例如：担心美联储降息预期落空…"
+            aria-label="保障需求描述"
+            className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
           />
-          {taskError ? (
-            <p className="units-text-caption mt-2 rounded-[var(--units-radius-sm)] border border-[var(--units-red)] bg-[color-mix(in_srgb,var(--units-red)_10%,transparent)] px-2.5 py-1.5 text-center text-[var(--units-red)]">
-              {taskError}
-            </p>
-          ) : null}
-        </div>
+          <Button
+            type="submit"
+            className="h-9 shrink-0 rounded-xl bg-[var(--units-orange)] px-4 text-[13px] font-semibold text-[var(--units-on-accent)] hover:bg-[color-mix(in_srgb,var(--units-orange)_88%,black)]"
+          >
+            进入工作台
+            <ArrowRight className="size-3.5" />
+          </Button>
+        </form>
 
         <div className="flex flex-wrap justify-center gap-2">
           {PROMPT_HINTS.map((hint) => (

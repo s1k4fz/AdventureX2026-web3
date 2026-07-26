@@ -38,7 +38,11 @@ export function LandingPage() {
       </div>
       <header className="relative mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5 md:px-10">
         <span className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
-          <img src="/logo.svg" alt="" className="size-6 rounded-[6px]" />
+          <img
+            src="/brand-logo-without-bg.png"
+            alt=""
+            className="size-7 object-contain"
+          />
           xEngine
         </span>
         <Link
@@ -51,15 +55,13 @@ export function LandingPage() {
       </header>
 
       <section className="relative mx-auto flex min-h-[72vh] w-full max-w-5xl flex-col justify-center px-6 py-16 md:px-10">
+        <h1 className="sr-only">xEngine</h1>
         <img
-          src="/logo.svg"
-          alt=""
-          className="size-14 rounded-[14px] md:size-16 md:rounded-[16px]"
+          src="/brand-logo.png"
+          alt="xEngine 差分机"
+          className="h-20 w-auto max-w-[min(100%,22rem)] object-contain object-left md:h-28"
         />
-        <h1 className="mt-5 text-4xl font-semibold tracking-tight md:text-5xl">
-          xEngine
-        </h1>
-        <p className="mt-5 max-w-md text-[15px] leading-relaxed text-zinc-500">
+        <p className="mt-6 max-w-md text-[15px] leading-relaxed text-zinc-500">
           把一句担忧变成可执行的链上保障。
         </p>
         <div className="mt-8">

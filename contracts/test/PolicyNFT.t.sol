@@ -93,8 +93,8 @@ contract PolicyNFTTest is Test {
     // ─── Configuration and interfaces ────────────────────────────────────────
 
     function test_configurationAndInterfaceSupport() public view {
-        assertEq(nft.name(), "Lemma Policy");
-        assertEq(nft.symbol(), "LPOL");
+        assertEq(nft.name(), "xEngine Policy");
+        assertEq(nft.symbol(), "XPOL");
         assertEq(address(nft.vault()), address(vault));
         assertEq(nft.baseURI(), BASE_URI);
 

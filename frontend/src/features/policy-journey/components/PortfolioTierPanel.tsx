@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { FundPolicyButton } from '@/features/policy/FundPolicyButton'
+import type { FundPolicyController } from '@/features/policy/useFundPolicy'
 import { MIN_PREMIUM_USDC } from '@/features/policy/policyStatus'
 import type { PortfolioOut } from '@/features/policy/policyApi'
 import {
@@ -29,6 +30,10 @@ export interface PortfolioTierPanelProps {
   selecting?: boolean
   showPositionCount?: boolean
   index?: number
+  /** 阶段层共享的出资状态机（单一进度入口）。 */
+  fundingController?: FundPolicyController
+  /** 不在档位卡内联渲染链上进度。 */
+  hideInlineFundingSteps?: boolean
 }
 
 export function PortfolioTierPanel({
@@ -44,6 +49,8 @@ export function PortfolioTierPanel({
   selecting,
   showPositionCount,
   index = 0,
+  fundingController,
+  hideInlineFundingSteps,
 }: PortfolioTierPanelProps) {
   const [scenariosOpen, setScenariosOpen] = useState(false)
   const premium = premiumOverride ?? portfolio.premiumEstimate ?? 0
@@ -222,6 +229,8 @@ export function PortfolioTierPanel({
             portfolioId={portfolio.id}
             portfolio={workingPortfolio}
             isProposed={Boolean(isProposed)}
+            controller={fundingController}
+            hideInlineSteps={hideInlineFundingSteps}
           />
         </div>
       ) : null}

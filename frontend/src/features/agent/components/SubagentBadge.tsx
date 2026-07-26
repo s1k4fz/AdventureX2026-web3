@@ -8,6 +8,7 @@ import {
 import {
   getSubagentIdentity,
   MAIN_AGENT_IDENTITY,
+  PERMISSION_LABELS,
 } from '@/features/agent/subagentIdentity'
 import {
   SUBAGENT_STATUS_LABELS,
@@ -98,6 +99,7 @@ export function SubagentBadge({
         role: MAIN_AGENT_IDENTITY.role,
         accent: MAIN_AGENT_IDENTITY.accent,
         monogram: MAIN_AGENT_IDENTITY.monogram,
+        permission: MAIN_AGENT_IDENTITY.permission,
         technical: 'Main',
       }
     : getSubagentIdentity(kind)
@@ -116,8 +118,8 @@ export function SubagentBadge({
       )}
       title={
         mainAgent
-          ? `${identity.alias} · ${identity.role}`
-          : `${identity.alias} · ${identity.role}（${identity.technical}）`
+          ? `${identity.alias} · ${identity.role} · ${PERMISSION_LABELS[identity.permission]}`
+          : `${identity.alias} · ${identity.role}（${identity.technical}）· ${PERMISSION_LABELS[identity.permission]}`
       }
     >
       <span

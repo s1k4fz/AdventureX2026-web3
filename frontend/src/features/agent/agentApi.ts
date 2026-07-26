@@ -14,6 +14,7 @@ import {
 } from './streamAgentEvents'
 import type {
   AgentApproval,
+  AgentConnectionState,
   AgentTaskDetail,
   AgentTaskListItem,
   AgentTaskViewState,
@@ -75,12 +76,10 @@ export async function createAgentTask(variables: {
   goalText: string
   title?: string
   clientRequestId?: string
-  conversationId?: string
 }): Promise<AgentTaskDetail> {
   agentDebug('create task', {
     goalText: variables.goalText.slice(0, 120),
     clientRequestId: variables.clientRequestId,
-    conversationId: variables.conversationId,
   })
   const { data } = await signOutOn401(
     apiClient.post<AgentTaskDetail>('/api/v1/agent-tasks', {
@@ -88,7 +87,6 @@ export async function createAgentTask(variables: {
       goalText: variables.goalText,
       title: variables.title,
       clientRequestId: variables.clientRequestId,
-      conversationId: variables.conversationId,
     })
   )
   agentDebug('create task ok', {
@@ -325,6 +323,8 @@ export function useAgentTaskLive(taskId: string | undefined): {
   isLoading: boolean
   isError: boolean
   streamError: Error | null
+  /** 可见连接态：重连中 / 致命停止时由 UI 展示 ConnectionBanner。 */
+  connectionState: AgentConnectionState
   setActiveArtifactId: (id: string | null) => void
   setActiveViewId: (id: string | null) => void
   pendingApprovals: AgentApproval[]
@@ -339,6 +339,14 @@ export function useAgentTaskLive(taskId: string | undefined): {
     taskId: string
     error: Error
   } | null>(null)
+  const [connectionState, setConnectionState] =
+    useState<AgentConnectionState>('live')
+  // 渲染期派生：切换任务时重置连接态，避免旧任务的 stopped 残留。
+  const [connTaskId, setConnTaskId] = useState<string | undefined>(taskId)
+  if (connTaskId !== taskId) {
+    setConnTaskId(taskId)
+    setConnectionState('live')
+  }
   const cursorRef = useRef(0)
   const cursorTaskIdRef = useRef<string | null>(null)
   const baselineRef = useRef<AgentTaskViewState | null>(null)
@@ -387,7 +395,10 @@ export function useAgentTaskLive(taskId: string | undefined): {
             taskId,
             afterSequence: cursorRef.current,
             signal: controller.signal,
-            onOpen: () => setStreamError(null),
+            onOpen: () => {
+              setStreamError(null)
+              setConnectionState('live')
+            },
             onEvent: (event) => {
               setLive((current) => {
                 const latestBaseline = baselineRef.current
@@ -430,6 +441,7 @@ export function useAgentTaskLive(taskId: string | undefined): {
               error: fatal.message,
             })
             setStreamError({ taskId, error: fatal })
+            setConnectionState('stopped')
             return
           }
           agentDebugWarn('live subscribe error; retrying', {
@@ -437,6 +449,7 @@ export function useAgentTaskLive(taskId: string | undefined): {
             cursor: cursorRef.current,
             error: error instanceof Error ? error.message : String(error),
           })
+          setConnectionState('reconnecting')
           const delayMs = Math.min(1000 * 2 ** reconnectAttempt, 30_000)
           reconnectAttempt += 1
           await waitForStreamReconnect(controller.signal, delayMs)
@@ -470,6 +483,7 @@ export function useAgentTaskLive(taskId: string | undefined): {
     isLoading: query.isPending,
     isError: query.isError || Boolean(fatalStreamError),
     streamError: fatalStreamError,
+    connectionState,
     setActiveArtifactId: (id) =>
       setLive((current) => {
         const source = current ?? baseline

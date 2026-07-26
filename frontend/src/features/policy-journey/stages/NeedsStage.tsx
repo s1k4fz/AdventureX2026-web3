@@ -20,7 +20,7 @@ const ESCAPE_AFTER_MS = 25_000
 const GENERATE_TIMEOUT_MS = 45_000
 const AUTO_ADVANCE_DELAY_MS = 240
 const QUESTIONNAIRE_WELCOME =
-  '当然可以。我会先了解你的风险偏好与保障需求，再检索市场并编排适合的保障方案。请先回答几个问题。'
+  '先完成一份风险问卷：系统会按你的回答检索预测市场，并编排适合的保障方案。'
 
 const GENERATING_HINTS = [
   '正在分析你的风险描述…',
@@ -494,9 +494,14 @@ function QuestionnaireCard({
       <div className="mx-auto min-h-full w-full max-w-[55rem] px-6 pb-40">
         <ol className="flex flex-col gap-7 py-5">
           {initialMessage ? (
-            <li className="flex list-none justify-end">
-              <div className="max-w-[min(90%,32rem)] whitespace-pre-wrap rounded-[22px] border border-[color-mix(in_srgb,var(--units-black)_8%,transparent)] bg-[color-mix(in_srgb,var(--units-black)_5%,transparent)] px-[18px] py-3 text-[15px] leading-7 text-foreground [overflow-wrap:anywhere]">
-                {initialMessage}
+            <li className="list-none">
+              <div className="rounded-2xl border border-[color-mix(in_srgb,var(--units-black)_8%,transparent)] bg-[color-mix(in_srgb,var(--units-black)_4%,transparent)] px-[18px] py-3.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  保障需求
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-[15px] leading-7 text-foreground [overflow-wrap:anywhere]">
+                  {initialMessage}
+                </p>
               </div>
             </li>
           ) : null}

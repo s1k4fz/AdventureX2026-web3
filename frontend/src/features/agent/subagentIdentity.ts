@@ -2,6 +2,19 @@
 
 import type { AgentSubagentKind } from './types'
 
+/**
+ * 权限级别（V1 信任模型的用户心智传达）：
+ * - read：只读检索，不会发起交易；
+ * - propose：生成方案，不能动钱；
+ * - 链上执行永远属于用户钱包（无 execute 角色）。
+ */
+export type SubagentPermission = 'read' | 'propose'
+
+export const PERMISSION_LABELS: Record<SubagentPermission, string> = {
+  read: '只读检索 · 不会发起交易',
+  propose: '生成方案 · 链上执行始终由你确认',
+}
+
 export type SubagentIdentity = {
   kind: AgentSubagentKind
   /** Display name on the badge (工牌名). */
@@ -14,6 +27,8 @@ export type SubagentIdentity = {
   accent: string
   /** One-character monogram for the badge face. */
   monogram: string
+  /** Capability boundary shown on the badge tooltip. */
+  permission: SubagentPermission
 }
 
 export const MAIN_AGENT_IDENTITY = {
@@ -21,6 +36,7 @@ export const MAIN_AGENT_IDENTITY = {
   role: '派发与编排',
   accent: 'var(--units-orange)',
   monogram: '主',
+  permission: 'propose' as SubagentPermission,
 } as const
 
 export const SUBAGENT_IDENTITIES: Record<AgentSubagentKind, SubagentIdentity> = {
@@ -31,6 +47,7 @@ export const SUBAGENT_IDENTITIES: Record<AgentSubagentKind, SubagentIdentity> = 
     technical: 'Polymarket',
     accent: 'var(--units-blue)',
     monogram: '行',
+    permission: 'read',
   },
   world_monitor: {
     kind: 'world_monitor',
@@ -39,6 +56,7 @@ export const SUBAGENT_IDENTITIES: Record<AgentSubagentKind, SubagentIdentity> = 
     technical: 'WorldMonitor',
     accent: 'var(--units-green)',
     monogram: '望',
+    permission: 'read',
   },
   pandaai: {
     kind: 'pandaai',
@@ -47,6 +65,7 @@ export const SUBAGENT_IDENTITIES: Record<AgentSubagentKind, SubagentIdentity> = 
     technical: 'PandaAI',
     accent: 'var(--units-blue)',
     monogram: '量',
+    permission: 'read',
   },
   news: {
     kind: 'news',
@@ -55,6 +74,7 @@ export const SUBAGENT_IDENTITIES: Record<AgentSubagentKind, SubagentIdentity> = 
     technical: 'News',
     accent: 'var(--units-yellow)',
     monogram: '闻',
+    permission: 'read',
   },
   web: {
     kind: 'web',
@@ -63,6 +83,7 @@ export const SUBAGENT_IDENTITIES: Record<AgentSubagentKind, SubagentIdentity> = 
     technical: 'Web',
     accent: 'var(--units-lilac)',
     monogram: '网',
+    permission: 'read',
   },
   synthesizer: {
     kind: 'synthesizer',
@@ -71,6 +92,7 @@ export const SUBAGENT_IDENTITIES: Record<AgentSubagentKind, SubagentIdentity> = 
     technical: 'Synthesizer',
     accent: 'var(--units-orange)',
     monogram: '情',
+    permission: 'read',
   },
 }
 
@@ -87,6 +109,7 @@ export function getSubagentIdentity(
     technical: kind || 'unknown',
     accent: 'var(--units-black)',
     monogram: '调',
+    permission: 'read',
   }
 }
 

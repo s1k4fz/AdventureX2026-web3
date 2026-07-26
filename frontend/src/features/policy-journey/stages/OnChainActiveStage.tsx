@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, CircleAlert, Gem, WalletCards } from 'lucide-react'
+import { Gem, WalletCards } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -9,6 +9,7 @@ import type { AgentTaskStatus } from '@/features/agent/types'
 import { canProceedToFunding, canRetry } from '@/features/agent/taskCapabilities'
 import { PolicyCommandRetry } from '@/features/agent/artifacts/PolicyCommandRetry'
 import { FundingChainSteps } from '@/features/policy/OnChainActivity'
+import { useFundPolicy } from '@/features/policy/useFundPolicy'
 import { PolicyNFTPanel } from '@/features/policy/PolicyNFTPanel'
 import {
   usePolicyQuery,
@@ -17,6 +18,7 @@ import {
 
 import { ComparisonMatrix } from '../components/ComparisonMatrix'
 import { TIER_LABELS } from '../components/matrixColumns'
+import { PreflightChecklist } from '../components/PreflightChecklist'
 import { StageShell } from '../components/StageShell'
 import type { StageStatus } from '../types'
 
@@ -52,6 +54,9 @@ export function OnChainActiveStage({
     pollSettled: true,
   })
   const policy = policyQuery.data
+  // 出资状态机上提到阶段层：预览态与真实进度共用同一个渲染入口，
+  // FundPolicyButton 只负责触发（消除「预览卡 + 按钮内进度」两套 UI）。
+  const funding = useFundPolicy(policyId ?? undefined)
 
   const goToPolicy = (tab?: 'nft') => {
     if (!tab && onEnterPolicy) {
@@ -138,16 +143,31 @@ export function OnChainActiveStage({
 
   const checks = [
     {
+      id: 'wallet',
       ok: wallet.isConnected,
       label: wallet.isConnected ? '钱包已连接' : '请先连接钱包',
-      action: wallet.isConnected ? null : ('connect' as const),
+      action: wallet.isConnected ? null : (
+        <WalletConnectButton className="h-8 shrink-0 px-3 text-[12.5px]" />
+      ),
     },
     {
+      id: 'network',
       ok: !wallet.isWrongNetwork,
       label: wallet.isWrongNetwork ? '请切换到 Injective 测试网' : '网络就绪',
-      action: wallet.isWrongNetwork ? ('switch' as const) : null,
+      action: wallet.isWrongNetwork ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-8 shrink-0 rounded-full border-[var(--units-stroke-color)] px-3 text-[12.5px] shadow-none"
+          onClick={() => void wallet.switchToInjectiveTestnet()}
+        >
+          切换网络
+        </Button>
+      ) : null,
     },
     {
+      id: 'policy',
       ok: Boolean(policyId),
       label: policyId
         ? '保单已就绪'
@@ -236,39 +256,21 @@ export function OnChainActiveStage({
     >
       {fundingEnabled ? (
         <div className="flex flex-col gap-3">
-          <ul className="flex flex-col gap-2">
-            {checks.map((check) => (
-              <li
-                key={check.label}
-                className="flex items-center gap-3 rounded-xl border border-[var(--units-stroke-color)] bg-[var(--units-wash-strong)] px-3.5 py-3"
-              >
-                {check.ok ? (
-                  <CheckCircle2 className="size-4 shrink-0 text-[var(--units-green)]" />
-                ) : (
-                  <CircleAlert className="size-4 shrink-0 text-[var(--units-orange)]" />
-                )}
-                <span className="min-w-0 flex-1 text-[13.5px] font-medium">
-                  {check.label}
-                </span>
-                {check.action === 'connect' ? (
-                  <WalletConnectButton className="h-8 shrink-0 px-3 text-[12.5px]" />
-                ) : check.action === 'switch' ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8 shrink-0 rounded-full border-[var(--units-stroke-color)] px-3 text-[12.5px] shadow-none"
-                    onClick={() => void wallet.switchToInjectiveTestnet()}
-                  >
-                    切换网络
-                  </Button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
+          <PreflightChecklist
+            items={checks.map((check) => ({
+              id: check.id,
+              ok: check.ok,
+              label: check.label,
+              action: check.action,
+            }))}
+          />
           <FundingChainSteps
-            step="idle"
-            awaitingStart
+            step={funding.step}
+            awaitingStart={funding.step === 'idle'}
+            approveTx={funding.approveTx}
+            openTx={funding.openTx}
+            onChainPolicyId={funding.fundingPlan?.onChainPolicyId}
+            errorMessage={funding.errorMessage}
             className="border-[var(--units-stroke-color)] bg-[var(--units-wash-strong)]"
           />
         </div>
@@ -287,6 +289,8 @@ export function OnChainActiveStage({
           isProposed={fundingEnabled}
           selectedPortfolioId={selectedPortfolioId}
           showGlobalContext={false}
+          fundingController={fundingEnabled ? funding : undefined}
+          hideInlineFundingSteps={fundingEnabled}
         />
       ) : null}
 

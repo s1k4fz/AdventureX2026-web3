@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Check, ChevronDown, ChevronRight, Circle, Clock, Loader2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -29,6 +29,36 @@ const FUNDING_ORDER: FundingStep[] = [
 function fundingIndex(step: FundingStep): number {
   const idx = FUNDING_ORDER.indexOf(step)
   return idx >= 0 ? idx : -1
+}
+
+/**
+ * 软超时阈值：超过后不判失败，只提示交易仍在等待确认，
+ * 避免 RPC 慢 / 钱包未弹窗时被误判为卡死（禁止无限 spinner）。
+ */
+const SOFT_TIMEOUT_MS: Partial<Record<FundingStep, number>> = {
+  selecting: 30_000,
+  'checking-balance': 30_000,
+  minting: 60_000,
+  approving: 60_000,
+  funding: 60_000,
+  confirming: 120_000,
+}
+
+function useSoftTimeout(step: FundingStep): boolean {
+  const [stalled, setStalled] = useState(false)
+  // 渲染期派生：步骤切换时同步重置，避免 effect 内直接 setState。
+  const [prevStep, setPrevStep] = useState(step)
+  if (prevStep !== step) {
+    setPrevStep(step)
+    setStalled(false)
+  }
+  useEffect(() => {
+    const ms = SOFT_TIMEOUT_MS[step]
+    if (!ms) return undefined
+    const timer = window.setTimeout(() => setStalled(true), ms)
+    return () => window.clearTimeout(timer)
+  }, [step])
+  return stalled
 }
 
 function TechDetails({
@@ -82,6 +112,7 @@ export function FundingChainSteps({
   className?: string
 }) {
   const [techOpen, setTechOpen] = useState(false)
+  const stalled = useSoftTimeout(step)
 
   if (step === 'idle' && !awaitingStart) return null
 
@@ -187,6 +218,15 @@ export function FundingChainSteps({
           </li>
         ))}
       </ol>
+      {stalled && !failed && !preview ? (
+        <p
+          role="status"
+          className="mt-2 rounded-md border border-[color-mix(in_srgb,var(--units-orange)_30%,transparent)] bg-[color-mix(in_srgb,var(--units-orange)_8%,transparent)] px-2.5 py-2 text-[11.5px] leading-relaxed text-muted-foreground"
+        >
+          当前步骤等待时间较长，交易仍在确认中——可在钱包中查看弹窗或交易状态；
+          下方交易链接可复制 hash 自行查询，无需刷新页面。
+        </p>
+      ) : null}
       {onChainPolicyId && (
         <div className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
           链上保单 ID{' '}

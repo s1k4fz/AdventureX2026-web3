@@ -17,8 +17,8 @@ interface IERC721Receiver {
 ///      from `baseURI + decimal(tokenId)`. The contract intentionally has no admin role,
 ///      burn function, enumeration extension, or mutable metadata configuration.
 contract PolicyNFT {
-    string public constant name = "Lemma Policy";
-    string public constant symbol = "LPOL";
+    string public constant name = "xEngine Policy";
+    string public constant symbol = "XPOL";
 
     bytes4 private constant _INTERFACE_ID_ERC165 = 0x01ffc9a7;
     bytes4 private constant _INTERFACE_ID_ERC721 = 0x80ac58cd;

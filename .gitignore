@@ -6,3 +6,5 @@
 /lemma-ai-main/
 # Foundry toolchain installed in-workspace for contract build/test/deploy
 /.foundry/
+# Git worktrees (local isolation)
+.worktrees/

@@ -1,6 +1,10 @@
 /** Agent Task wire types (camelCase, mirrors backend schemas/agent_task.py). */
 
 export type AgentTaskKind = 'policy_planning'
+
+/** 实时连接可见态：重连中 / 已停止需要在 UI 上给出反馈。 */
+export type AgentConnectionState = 'live' | 'reconnecting' | 'stopped'
+
 export type AgentTaskStatus =
   | 'draft'
   | 'running'

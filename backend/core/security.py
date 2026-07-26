@@ -164,10 +164,11 @@ def _unverified_claims(token: str) -> str:
 
 
 def _role_from_payload(payload: dict[str, Any]) -> str:
-    app_metadata = payload.get("app_metadata")
-    if not isinstance(app_metadata, dict):
-        return "user"
-    return "admin" if app_metadata.get("role") == "admin" else "user"
+    # Demo mode: every authenticated user is treated as admin so anyone can
+    # exercise the settle/demo accelerators. Restore the app_metadata check
+    # below when leaving demo mode.
+    del payload
+    return "admin"
 
 
 async def get_current_user(

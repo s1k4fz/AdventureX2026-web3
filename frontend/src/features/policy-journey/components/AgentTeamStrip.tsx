@@ -15,6 +15,7 @@ import {
 } from '@/components/DecryptedText'
 import {
   INTEL_SUBAGENT_KINDS,
+  PERMISSION_LABELS,
   getSubagentIdentity,
 } from '@/features/agent/subagentIdentity'
 import {
@@ -87,7 +88,7 @@ function TeamChip({
         (status === 'pending' || status === 'skipped') && 'opacity-60'
       )}
       style={{ animationDelay: `${index * 40}ms` }}
-      title={`${identity.alias} · ${identity.role} · ${SUBAGENT_STATUS_LABELS[status]}`}
+      title={`${identity.alias} · ${identity.role} · ${SUBAGENT_STATUS_LABELS[status]} · ${PERMISSION_LABELS[identity.permission]}`}
     >
       <span
         className="flex size-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold"
@@ -121,6 +122,11 @@ export interface AgentTeamStripProps {
   subagents?: AgentSubagent[]
   /** Opens the technical detail section below the strip. */
   onOpenDetails?: () => void
+  /**
+   * 左轨常驻形态：只渲染头像堆 + 汇总行，让非检索阶段也有
+   * Agent 在场感；详情仍靠 title 提示与检索阶段的完整泳道。
+   */
+  compact?: boolean
   className?: string
 }
 
@@ -132,6 +138,7 @@ export interface AgentTeamStripProps {
 export function AgentTeamStrip({
   subagents = [],
   onOpenDetails,
+  compact = false,
   className,
 }: AgentTeamStripProps) {
   const byKind = new Map(subagents.map((row) => [row.kind, row]))
@@ -159,6 +166,59 @@ export function AgentTeamStrip({
         : done > 0
           ? `完成 ${done}/${total}`
           : '调查员待命，等待主理人派发'
+
+  if (compact) {
+    return (
+      <section
+        className={cn(
+          'rounded-xl border border-[var(--units-stroke-color)] bg-background px-2.5 py-2',
+          className
+        )}
+        aria-label="多Agent 调查团队"
+      >
+        <p className="text-[11px] font-semibold text-muted-foreground">
+          调查团队
+          <span className="ml-1.5 font-normal tabular-nums">{summary}</span>
+        </p>
+        <div className="mt-1.5 flex items-center gap-1">
+          {SUBAGENT_KIND_ORDER.map((kind) => {
+            const identity = getSubagentIdentity(kind)
+            const status = byKind.get(kind)?.status ?? 'pending'
+            return (
+              <span
+                key={kind}
+                className={cn(
+                  'relative flex size-6 shrink-0 items-center justify-center rounded-full text-[9.5px] font-bold',
+                  (status === 'pending' || status === 'skipped') &&
+                    'opacity-45'
+                )}
+                style={{
+                  background: `color-mix(in srgb, ${identity.accent} 88%, transparent)`,
+                  color: 'var(--units-brand-plate)',
+                }}
+                title={`${identity.alias} · ${SUBAGENT_STATUS_LABELS[status]} · ${PERMISSION_LABELS[identity.permission]}`}
+              >
+                {identity.monogram}
+                <span
+                  className={cn(
+                    'absolute -bottom-0.5 -right-0.5 size-2 rounded-full border border-background',
+                    status === 'succeeded'
+                      ? 'bg-[var(--units-green)]'
+                      : status === 'failed'
+                        ? 'bg-destructive'
+                        : status === 'running'
+                          ? 'animate-pulse bg-[var(--units-orange)]'
+                          : 'bg-[color-mix(in_srgb,var(--units-black)_22%,transparent)]'
+                  )}
+                  aria-hidden
+                />
+              </span>
+            )
+          })}
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section

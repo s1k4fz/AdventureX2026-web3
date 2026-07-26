@@ -54,6 +54,19 @@ export interface FundingState {
   openTx: string | null
 }
 
+/**
+ * 出资状态机控制器：可由阶段层（OnChainActiveStage）创建后下发给
+ * FundPolicyButton，使进度渲染收敛到单一入口。
+ */
+export type FundPolicyController = FundingState & {
+  fund: (
+    portfolioId: string,
+    premium?: number,
+    positionOverrides?: Array<{ marketRef: string; weightBps: number }>
+  ) => Promise<void>
+  reset: () => void
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -108,7 +121,7 @@ async function pollUntil(
 // Hook: useFundPolicy
 // ---------------------------------------------------------------------------
 
-export function useFundPolicy(policyId: string | undefined) {
+export function useFundPolicy(policyId: string | undefined): FundPolicyController {
   const queryClient = useQueryClient()
   const [state, setState] = useState<FundingState>({
     step: 'idle',

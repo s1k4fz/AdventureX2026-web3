@@ -40,7 +40,11 @@ function PublicPageShell({ children }: { children: React.ReactNode }) {
             to="/"
             className="units-text-title inline-flex items-center gap-2 text-foreground"
           >
-            <img src="/logo.svg" alt="" className="size-5 rounded-[5px]" />
+            <img
+              src="/brand-logo-without-bg.png"
+              alt=""
+              className="size-6 object-contain"
+            />
             xEngine
           </Link>
           <Badge

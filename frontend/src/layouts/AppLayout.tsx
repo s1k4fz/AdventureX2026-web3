@@ -35,7 +35,11 @@ function SidebarHeader() {
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center bg-zinc-100 px-3 dark:bg-sidebar">
       <Button variant="ghost" size="icon-sm" aria-label="首页" asChild>
         <Link to="/home">
-          <img src="/logo.svg" alt="xEngine" className="size-5 rounded-[5px]" />
+          <img
+            src="/brand-logo-without-bg.png"
+            alt="xEngine"
+            className="size-6 object-contain"
+          />
         </Link>
       </Button>
       <span className="units-text-body font-display font-semibold tracking-tight text-foreground">

@@ -35,7 +35,7 @@ import {
   PREMIUM_PRESETS,
 } from './policyStatus'
 import { useFundPolicy, formatUsdcBaseUnits } from './useFundPolicy'
-import type { FundingStep } from './useFundPolicy'
+import type { FundingStep, FundPolicyController } from './useFundPolicy'
 import { FundingChainSteps } from './OnChainActivity'
 import { TxLink } from '@/features/wallet/TxLink'
 
@@ -57,6 +57,13 @@ interface FundPolicyButtonProps {
   portfolio: PortfolioOut
   isProposed: boolean
   positionOverrides?: Array<{ marketRef: string; weightBps: number }>
+  /**
+   * 阶段层下发的共享出资状态机（单一进度入口）；
+   * 未提供时回退为按钮自持状态（保单详情页路径）。
+   */
+  controller?: FundPolicyController
+  /** 为 true 时不在按钮下方内联渲染链上进度（由阶段层统一渲染）。 */
+  hideInlineSteps?: boolean
 }
 
 export function FundPolicyButton({
@@ -65,12 +72,15 @@ export function FundPolicyButton({
   portfolio,
   isProposed,
   positionOverrides,
+  controller,
+  hideInlineSteps = false,
 }: FundPolicyButtonProps) {
   const { status, isConnected, isWrongNetwork, connect, switchToInjectiveTestnet, address } =
     useWallet()
   const isTxInFlight = useTxLockStore((s) => s.isTxInFlight)
+  const ownFunding = useFundPolicy(controller ? undefined : policyId)
   const { step, errorMessage, fundingPlan, fund, reset, approveTx, openTx } =
-    useFundPolicy(policyId)
+    controller ?? ownFunding
 
   const defaultPremium = portfolio.premiumEstimate ?? 100
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -238,7 +248,7 @@ export function FundPolicyButton({
         {ctaLabel}
       </Button>
 
-      {isInProgress && (
+      {!hideInlineSteps && isInProgress && (
         <FundingChainSteps
           step={step}
           approveTx={approveTx}
@@ -247,7 +257,7 @@ export function FundPolicyButton({
         />
       )}
 
-      {step === 'error' && (
+      {!hideInlineSteps && step === 'error' && (
         <FundingChainSteps
           step={step}
           approveTx={approveTx}

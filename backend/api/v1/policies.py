@@ -59,6 +59,45 @@ async def get_policy_nft_metadata(
 
 
 @router.post(
+    "/demo/pending-settlement",
+    response_model=PolicyDetailOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_demo_pending_settlement(
+    current_user: CurrentUser = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> PolicyDetailOut:
+    """One-click demo: open a real testnet policy already awaiting settlement.
+
+    Registered above the /{policy_id} routes so "demo" is never parsed as a
+    UUID. Slow by nature (2-3 chain txs, ~1 min); the demo button waits.
+    """
+    from services.policy_demo_service import (  # noqa: PLC0415
+        DemoPolicyError,
+        create_pending_settlement_policy,
+    )
+
+    try:
+        policy_id = await create_pending_settlement_policy(db, user_id=current_user.id)
+    except DemoPolicyError as exc:
+        if exc.code == "busy":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="demo_policy_busy"
+            ) from exc
+        logger.exception("demo policy creation failed: %s", exc.code)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail={"code": exc.code, "message": exc.message},
+        ) from exc
+    detail = await policy_service.get_policy_detail(
+        db, user_id=current_user.id, policy_id=policy_id
+    )
+    if detail is None:
+        raise _NOT_FOUND
+    return detail
+
+
+@router.post(
     "/{policy_id}/intake",
     response_model=PolicyDetailOut,
     status_code=status.HTTP_202_ACCEPTED,

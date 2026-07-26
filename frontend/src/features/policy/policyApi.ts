@@ -487,6 +487,18 @@ export async function triggerSettle(
   return data
 }
 
+/**
+ * Demo accelerator: create a REAL testnet policy that is already past its
+ * coverage window (待结算). Slow by design — the backend sends 2-3 chain
+ * transactions (~1 min), so no timeout is set here.
+ */
+export async function createDemoPendingSettlePolicy(): Promise<PolicyDetail> {
+  const { data } = await signOutOn401(
+    apiClient.post<PolicyDetail>('/api/v1/policies/demo/pending-settlement')
+  )
+  return data
+}
+
 export async function getPolicyNFTPreview(policyId: string): Promise<string> {
   const { data } = await signOutOn401(
     apiClient.get<string>(`/api/v1/policies/${policyId}/nft/preview`, {

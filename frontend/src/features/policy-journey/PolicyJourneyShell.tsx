@@ -9,6 +9,7 @@ import type {
   QuestionnaireQuestion,
   RiskFactorCategory,
 } from '@/features/policy/policyApi'
+import { AnimatePresence, motion, useUnitsMotion } from '@/lib/motion'
 import { cn } from '@/lib/utils'
 
 import { JourneyLayout } from './components/JourneyLayout'
@@ -40,6 +41,8 @@ export type PolicyJourneyShellProps = {
   selectedPortfolioId?: string | null
   /** Fill the parent workbench height and scroll inside the canvas. */
   fillHeight?: boolean
+  /** Read-only review of a past stage: skip terminal-state overrides. */
+  reviewing?: boolean
   className?: string
 }
 
@@ -65,9 +68,11 @@ export function PolicyJourneyShell({
   taskStatus,
   selectedPortfolioId,
   fillHeight = false,
+  reviewing = false,
   className,
 }: PolicyJourneyShellProps) {
   const navigate = useNavigate()
+  const { soft, reduce, y } = useUnitsMotion()
 
   const override = useOverrideFlow({
     taskId,
@@ -146,10 +151,23 @@ export function PolicyJourneyShell({
                 fillHeight && 'overflow-hidden'
               )}
             >
-              <JourneyStageCanvas
-                currentStage={journey.currentStage}
-                context={canvasContext}
-              />
+              {/* 阶段间平滑过渡：随 currentStage（含回看切换）淡入淡出。 */}
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={journey.currentStage}
+                  className="flex min-h-0 flex-1 flex-col"
+                  initial={reduce ? false : { opacity: 0, y }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduce ? undefined : { opacity: 0, y: -4 }}
+                  transition={soft}
+                >
+                  <JourneyStageCanvas
+                    currentStage={journey.currentStage}
+                    reviewing={reviewing}
+                    context={canvasContext}
+                  />
+                </motion.div>
+              </AnimatePresence>
             </div>
 
             {(journey.isOverriding || override.timedOut) && (

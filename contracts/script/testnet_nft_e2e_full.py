@@ -219,11 +219,11 @@ def test_1_deployment_verification(nft, vault, vault_addr: str, nft_addr: str) -
         record("无效接口正确拒绝", False, str(exc))
 
     try:
-        assert nft.functions.name().call() == "Lemma Policy"
-        assert nft.functions.symbol().call() == "LPOL"
-        record("name=Lemma Policy, symbol=LPOL", True)
+        assert nft.functions.name().call() == "xEngine Policy"
+        assert nft.functions.symbol().call() == "XPOL"
+        record("name=xEngine Policy, symbol=XPOL", True)
     except Exception as exc:
-        record("name=Lemma Policy, symbol=LPOL", False, str(exc))
+        record("name=xEngine Policy, symbol=XPOL", False, str(exc))
 
 
 def test_2_mint_and_ownership(
@@ -567,10 +567,10 @@ async def _run_db_tests(
             record("metadata 可获取", True)
 
             try:
-                assert body.get("name") and "Lemma Policy" in body["name"]
-                record("metadata.name 包含 Lemma Policy", True, body["name"])
+                assert body.get("name") and "xEngine Policy" in body["name"]
+                record("metadata.name 包含 xEngine Policy", True, body["name"])
             except Exception as exc:
-                record("metadata.name 包含 Lemma Policy", False, str(exc))
+                record("metadata.name 包含 xEngine Policy", False, str(exc))
 
             try:
                 assert body.get("description") and "privacy-safe" in body["description"].lower()

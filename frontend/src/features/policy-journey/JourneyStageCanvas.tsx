@@ -38,11 +38,15 @@ export interface JourneyStageCanvasContext {
 
 export interface JourneyStageCanvasProps {
   currentStage: JourneyStage
+  /** Read-only review of a past stage: keep the stage renderer instead of
+   * forcing the terminal-state screen. */
+  reviewing?: boolean
   context: JourneyStageCanvasContext
 }
 
 export function JourneyStageCanvas({
   currentStage,
+  reviewing = false,
   context,
 }: JourneyStageCanvasProps) {
   const {
@@ -74,6 +78,7 @@ export function JourneyStageCanvas({
   const search = journey.search as import('@/features/policy/streamPolicyCompose').MarketSearchProgress | null
 
   if (
+    !reviewing &&
     taskStatus &&
     (taskStatus === 'cancelled' || taskStatus === 'succeeded')
   ) {

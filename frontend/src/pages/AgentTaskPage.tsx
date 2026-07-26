@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useAgentTaskLive } from '@/features/agent/agentApi'
 import { AgentTaskShell } from '@/features/agent/components/AgentTaskShell'
-import { ConversationLoadingState } from '@/features/conversation/ConversationLoadingState'
+import { WorkbenchLoadingState } from '@/features/agent/components/WorkbenchLoadingState'
 
 export function AgentTaskPage() {
   const { id } = useParams<{ id: string }>()
@@ -12,14 +12,15 @@ export function AgentTaskPage() {
     isLoading,
     isError,
     streamError,
+    connectionState,
     setActiveViewId,
   } = useAgentTaskLive(id)
 
   if (isLoading) {
     return (
-      <ConversationLoadingState
-        message="正在恢复会话…"
-        hint="拉取历史消息、任务进度与产物画布"
+      <WorkbenchLoadingState
+        message="正在加载工作台…"
+        hint="同步任务进度与产物画布"
       />
     )
   }
@@ -51,6 +52,7 @@ export function AgentTaskPage() {
       activities={view.activities}
       activeViewId={view.activeViewId}
       onSelectView={(viewId) => setActiveViewId(viewId)}
+      connectionState={connectionState}
     />
   )
 }

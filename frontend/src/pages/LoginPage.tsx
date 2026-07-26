@@ -68,7 +68,11 @@ export function LoginPage() {
             to="/"
             className="inline-flex items-center justify-center gap-2 text-xl font-semibold tracking-tight text-foreground"
           >
-            <img src="/logo.svg" alt="" className="size-7 rounded-[7px]" />
+            <img
+              src="/brand-logo-without-bg.png"
+              alt=""
+              className="size-8 object-contain"
+            />
             xEngine
           </Link>
           <p className="mt-2 text-sm text-muted-foreground">

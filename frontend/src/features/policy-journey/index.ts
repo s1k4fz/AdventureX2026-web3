@@ -20,6 +20,13 @@ export {
   syncJourneyFromView,
 } from './journeyReducer'
 export { usePolicyJourneyState } from './usePolicyJourneyState'
+export {
+  PolicyJourneyProvider,
+  usePolicyJourneyContext,
+} from './journeyContext'
+export type { PolicyJourneyContextValue } from './journeyContext'
+export { STAGE_GUIDES } from './stageGuides'
+export type { StageGuide } from './stageGuides'
 export { PolicyJourneyShell, selectionErrorMessage } from './PolicyJourneyShell'
 export type { PolicyJourneyShellProps } from './PolicyJourneyShell'
 export {
@@ -39,6 +46,10 @@ export type {
 } from './JourneyStageCanvas'
 export { JourneyTrack } from './components/JourneyTrack'
 export type { JourneyTrackProps } from './components/JourneyTrack'
+export { StageGuideBar } from './components/StageGuideBar'
+export type { StageGuideBarProps } from './components/StageGuideBar'
+export { PreflightChecklist } from './components/PreflightChecklist'
+export type { PreflightCheckItem } from './components/PreflightChecklist'
 export { JourneyLayout } from './components/JourneyLayout'
 export type { JourneyLayoutProps } from './components/JourneyLayout'
 export { StageShell, StageSkeletonBlock } from './components/StageShell'

@@ -9,6 +9,8 @@ import re
 import uuid
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from functools import lru_cache
+from pathlib import Path
 
 import anyio
 from fastapi import HTTPException, status
@@ -35,21 +37,20 @@ _TIER_LABELS = {
     "balanced": "Balanced",
     "aggressive": "Aggressive",
 }
+# Accent colors are dark-on-light: text sits on the warm photographic
+# background and its translucent vellum stat panel, not a dark glass card.
 _TIER_COLORS = {
     "conservative": {
-        "accent": "#4A90D9",
-        "accent2": "#7EC8E3",
-        "badge_bg": "rgba(74,144,217,0.15)",
+        "accent": "#2F6BA8",
+        "accent2": "#4A90D9",
     },
     "balanced": {
-        "accent": "#3D8B6E",
-        "accent2": "#6BCB9A",
-        "badge_bg": "rgba(61,139,110,0.15)",
+        "accent": "#2E7D5B",
+        "accent2": "#4FAE85",
     },
     "aggressive": {
-        "accent": "#C75B2F",
-        "accent2": "#E8845A",
-        "badge_bg": "rgba(199,91,47,0.15)",
+        "accent": "#B04A22",
+        "accent2": "#D96B3F",
     },
 }
 _POSITION_COLORS = (
@@ -57,6 +58,10 @@ _POSITION_COLORS = (
     "#FF6B9D", "#4ECDC4", "#A78BFA", "#F472B6", "#34D399",
 )
 _SVG_SIZE_LIMIT = 32_000
+# Warm silk background, pre-processed offline from /nft-bg.png: center-cropped
+# to the 5:7 card ratio, resized to 500x700 (1.25x density), contrast softened
+# for text overlay and saved as a progressive JPEG small enough to inline.
+_BG_ASSET_PATH = Path(__file__).resolve().parent.parent / "assets" / "nft_bg.jpg"
 
 
 def policy_token_id(policy_id: uuid.UUID) -> str:
@@ -189,31 +194,26 @@ def _weight_bar(
     return "".join(parts)
 
 
-def _diagonal_streaks() -> str:
-    """Generate SVG diagonal gradient streaks simulating the warm hero-bg."""
-    # Multiple diagonal bands with varied warm tones
-    streaks = [
-        ("#D4918A", 0.25, -20, 60),
-        ("#F5E6D0", 0.35, 40, 90),
-        ("#C08858", 0.20, 100, 50),
-        ("#E8C0B0", 0.30, 160, 80),
-        ("#B8963C", 0.15, 240, 45),
-        ("#F0D4C8", 0.28, 290, 70),
-        ("#C090B0", 0.18, 350, 55),
-        ("#E0B888", 0.22, 410, 65),
-        ("#D4A0A0", 0.20, 470, 50),
-    ]
-    parts: list[str] = []
-    for color, opacity, offset, width in streaks:
-        # Diagonal rects rotated 35 degrees
-        parts.append(
-            f'<rect x="{offset}" y="-100" width="{width}" height="800" '
-            f'fill="{color}" fill-opacity="{opacity}"/>'
-        )
+@lru_cache(maxsize=1)
+def _background_data_uri() -> str | None:
+    """Inline the processed warm-silk photo once per process; None if absent."""
+    try:
+        raw = _BG_ASSET_PATH.read_bytes()
+    except OSError:
+        return None
+    return "data:image/jpeg;base64," + base64.b64encode(raw).decode()
+
+
+def _card_background_defs() -> str:
+    """Reusable <image> def; referenced by the card fill and the frost panel."""
+    uri = _background_data_uri()
+    if uri is None:
+        return ""
+    # A single def keeps the inlined JPEG payload counted once against the
+    # 32KB budget even though the photo is drawn twice (sharp + blurred).
     return (
-        '<g transform="rotate(-35 200 250)" opacity="0.9">'
-        + "".join(parts)
-        + "</g>"
+        f'<image id="bg-img" x="0" y="0" width="400" height="560" '
+        f'preserveAspectRatio="xMidYMid slice" xlink:href="{uri}"/>'
     )
 
 
@@ -222,7 +222,12 @@ def generate_nft_svg(
     portfolio: PolicyPortfolio | None,
     positions: Sequence[PolicyPosition],
 ) -> str:
-    """Return a card-style SVG with warm diagonal background and typographic layout."""
+    """Card SVG over the warm-silk photo with a three-level type hierarchy.
+
+    Level 1: serif display (hero status + italic subline).
+    Level 2: sans-serif structure (eyebrow, stat labels, numbers, badge).
+    Level 3: monospace metadata (token id, chain footer).
+    """
     tier_key = portfolio.tier if portfolio is not None else "balanced"
     tier = _TIER_LABELS.get(tier_key, "Balanced")
     colors = _TIER_COLORS.get(tier_key, _TIER_COLORS["balanced"])
@@ -243,21 +248,39 @@ def generate_nft_svg(
     status_label = policy.status.upper()
     is_settled = policy.status == "settled"
     pos_count = len(positions)
+    ratio = payout / premium if premium > 0 else 0.0
+    subline = f"Payout ratio {ratio:.2f}x \u00b7 {pos_count} positions"
 
     weight_bar = _weight_bar(positions)
-    streaks = _diagonal_streaks()
+    bg_defs = _card_background_defs()
+    # Sharp photo behind the card; a second blurred, panel-clipped pass gives
+    # the stat container a frosted-glass depth. Renderers without filter
+    # support degrade to the sharp photo under the translucent vellum fill.
+    bg_layer = (
+        '<g clip-path="url(#card-clip)"><use xlink:href="#bg-img"/></g>'
+        if bg_defs
+        else ""
+    )
+    panel_frost = (
+        '<g clip-path="url(#panel-clip)" filter="url(#frost)">'
+        '<use xlink:href="#bg-img"/></g>'
+        if bg_defs
+        else ""
+    )
 
-    # Settled pill
+    # Settled pill (L2 badge) sits above the serif hero.
     settled_el = (
-        f'<rect x="0" y="8" width="72" height="20" rx="10" '
-        f'fill="{colors["accent"]}" fill-opacity="0.12"/>'
-        f'<text x="36" y="22" text-anchor="middle" class="badge">SETTLED</text>'
+        f'<rect x="2" y="-58" width="78" height="22" rx="11" '
+        f'fill="{colors["accent"]}" fill-opacity="0.14"/>'
+        f'<rect x="2" y="-58" width="78" height="22" rx="11" fill="none" '
+        f'stroke="{colors["accent"]}" stroke-opacity="0.45" stroke-width="0.8"/>'
+        f'<text x="41" y="-43" text-anchor="middle" class="badge">SETTLED</text>'
         if is_settled
         else ""
     )
 
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="400" height="560" viewBox="0 0 400 560" role="img" aria-labelledby="title desc">
-<title id="title">Lemma Policy NFT {_escape_svg_text(token_short)}</title>
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="400" height="560" viewBox="0 0 400 560" role="img" aria-labelledby="title desc">
+<title id="title">xEngine Policy NFT {_escape_svg_text(token_short)}</title>
 <desc id="desc">Privacy-safe visualization of public policy economics</desc>
 <defs>
 <linearGradient id="base" x1="0" y1="0" x2="0.5" y2="1">
@@ -265,62 +288,89 @@ def generate_nft_svg(
 <stop offset="50%" stop-color="#E8C8B0"/>
 <stop offset="100%" stop-color="#D4A890"/>
 </linearGradient>
-<linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
-<stop offset="0%" stop-color="#1A1A2E" stop-opacity="0.88"/>
-<stop offset="100%" stop-color="#0F0F1A" stop-opacity="0.92"/>
+<linearGradient id="scrim-top" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#FFF9F2" stop-opacity="0.72"/>
+<stop offset="100%" stop-color="#FFF9F2" stop-opacity="0"/>
 </linearGradient>
-<filter id="blur-bg"><feGaussianBlur stdDeviation="8"/></filter>
-<clipPath id="card-clip"><rect x="20" y="180" width="360" height="360" rx="16"/></clipPath>
+<linearGradient id="scrim-bottom" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#FFF6EC" stop-opacity="0"/>
+<stop offset="100%" stop-color="#FFF6EC" stop-opacity="0.65"/>
+</linearGradient>
+<clipPath id="card-clip"><rect width="400" height="560" rx="24"/></clipPath>
+<clipPath id="panel-clip"><rect x="28" y="352" width="344" height="128" rx="14"/></clipPath>
+<filter id="frost" x="-15%" y="-15%" width="130%" height="130%"><feGaussianBlur stdDeviation="9"/></filter>
+{bg_defs}
 </defs>
 <style>
-.brand{{font:900 11px system-ui,sans-serif;letter-spacing:5px;fill:#1A1A2E;fill-opacity:0.7}}
-.id{{font:400 9px ui-monospace,monospace;letter-spacing:1.5px;fill:#4A3828;fill-opacity:0.6}}
-.hero{{font:900 48px system-ui,sans-serif;fill:#F8F4F0;letter-spacing:-2px}}
-.sub{{font:700 11px system-ui,sans-serif;letter-spacing:3px;fill:{colors["accent"]}}}
-.lbl{{font:600 8px system-ui,sans-serif;letter-spacing:2.5px;fill:#8B9AB0}}
-.num{{font-family:system-ui,sans-serif;font-weight:800;fill:#F0EDE8}}
-.unit{{font:500 10px system-ui,sans-serif;fill:#7A8899}}
-.badge{{font:700 8px system-ui,sans-serif;letter-spacing:2px;fill:{colors["accent"]}}}
-.foot{{font:400 7.5px ui-monospace,monospace;letter-spacing:1.2px;fill:#5A6478}}
-.pos-lbl{{font:600 8px system-ui,sans-serif;letter-spacing:2px;fill:#6B7A8E}}
+.hero{{font:600 46px Georgia,'Times New Roman',serif;letter-spacing:1px;fill:#241A12}}
+.hero-sub{{font:italic 400 13px Georgia,'Times New Roman',serif;fill:#5C4A38;fill-opacity:0.9}}
+.eyebrow{{font:700 9px system-ui,'Segoe UI',sans-serif;letter-spacing:4px;fill:{colors["accent"]}}}
+.wordmark{{font:800 15px system-ui,'Segoe UI',sans-serif;letter-spacing:0.3px;fill:#241A12}}
+.lbl{{font:600 8px system-ui,'Segoe UI',sans-serif;letter-spacing:2.5px;fill:#8A7660}}
+.num{{font-family:system-ui,'Segoe UI',sans-serif;font-weight:800;fill:#2B2018}}
+.unit{{font:500 10px system-ui,'Segoe UI',sans-serif;fill:#6B5A4A}}
+.badge{{font:700 9px system-ui,'Segoe UI',sans-serif;letter-spacing:2px;fill:{colors["accent"]}}}
+.pos-lbl{{font:600 8px system-ui,'Segoe UI',sans-serif;letter-spacing:2px;fill:#7A6650}}
+.id{{font:400 9px ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:1.5px;fill:#4A3828;fill-opacity:0.72}}
+.foot{{font:400 7.5px ui-monospace,'SF Mono',Menlo,monospace;letter-spacing:1.2px;fill:#5C4A38;fill-opacity:0.85}}
 </style>
 <rect width="400" height="560" rx="24" fill="url(#base)"/>
-{streaks}
-<g transform="translate(36 50)">
-<text class="brand">LEMMA</text>
-<text x="0" y="18" class="id">{_escape_svg_text(token_short)}</text>
+{bg_layer}
+<g clip-path="url(#card-clip)">
+<rect width="400" height="110" fill="url(#scrim-top)"/>
+<rect y="440" width="400" height="120" fill="url(#scrim-bottom)"/>
+</g>
+<rect x="0.5" y="0.5" width="399" height="559" rx="23.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="1"/>
+<rect x="14" y="14" width="372" height="532" rx="12" fill="none" stroke="#8A6A4A" stroke-opacity="0.28" stroke-width="0.6"/>
+<rect x="17.5" y="17.5" width="365" height="525" rx="9.5" fill="none" stroke="#8A6A4A" stroke-opacity="0.14" stroke-width="0.5"/>
+<g fill="none" stroke="#6B5138" stroke-opacity="0.6" stroke-width="1.3" stroke-linecap="round">
+<path d="M14 38 L14 24 Q14 14 24 14 L38 14"/>
+<path d="M362 14 L376 14 Q386 14 386 24 L386 38"/>
+<path d="M386 522 L386 536 Q386 546 376 546 L362 546"/>
+<path d="M38 546 L24 546 Q14 546 14 536 L14 522"/>
+</g>
+<g transform="translate(36 32)">
+<rect width="20" height="20" rx="6" fill="#2B2018"/>
+<path d="M6.2 6.2 L13.8 13.8 M13.8 6.2 L6.2 13.8" stroke="#FFF9F2" stroke-width="2.2" stroke-linecap="round"/>
+<circle cx="20" cy="0" r="2.4" fill="{colors["accent"]}"/>
+<text x="28" y="15" class="wordmark">xEngine</text>
+<text x="0" y="36" class="id">{_escape_svg_text(token_short)}</text>
 </g>
 <g transform="translate(364 50)" text-anchor="end">
 <text class="id">POLICY NFT</text>
 <text y="18" class="id">INJECTIVE</text>
 </g>
-<rect x="20" y="180" width="360" height="360" rx="16" fill="url(#glass)"/>
-<rect x="20" y="180" width="360" height="360" rx="16" fill="none" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="1"/>
-<g transform="translate(46 220)">
-<text class="sub">{_escape_svg_text(tier.upper())}</text>
-<text x="0" y="58" class="hero">{_escape_svg_text(status_label)}</text>
+<line x1="36" y1="82" x2="364" y2="82" stroke="#8A6A4A" stroke-opacity="0.25" stroke-width="0.5"/>
+<g transform="translate(40 236)">
 {settled_el}
+<text class="eyebrow">{_escape_svg_text(tier.upper())} PORTFOLIO</text>
+<text x="-2" y="52" class="hero">{_escape_svg_text(status_label)}</text>
+<text x="1" y="78" class="hero-sub">{_escape_svg_text(subline)}</text>
 </g>
-<line x1="46" y1="320" x2="354" y2="320" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="0.5"/>
-<g transform="translate(46 348)">
+<g>
+{panel_frost}
+<rect x="28" y="352" width="344" height="128" rx="14" fill="#FFF9F2" fill-opacity="0.52"/>
+<rect x="28" y="352" width="344" height="128" rx="14" fill="none" stroke="#FFFFFF" stroke-opacity="0.7" stroke-width="0.9"/>
+</g>
+<g transform="translate(50 380)">
 <text class="lbl">PREMIUM</text>
 <text y="28" class="num" font-size="{premium_size}" textLength="{premium_width:.1f}" lengthAdjust="spacingAndGlyphs">{_escape_svg_text(premium_text)}</text>
 <text x="{premium_unit_x:.1f}" y="28" class="unit">USDC</text>
 </g>
-<g transform="translate(354 348)" text-anchor="end">
+<g transform="translate(350 380)" text-anchor="end">
 <text class="lbl">{payout_label}</text>
 <text x="-33" y="28" class="num" font-size="{payout_size}" textLength="{payout_width:.1f}" lengthAdjust="spacingAndGlyphs">{_escape_svg_text(payout_text)}</text>
 <text y="28" class="unit">USDC</text>
 </g>
-<line x1="46" y1="415" x2="354" y2="415" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="0.5"/>
-<g transform="translate(46 435)">
+<line x1="50" y1="432" x2="350" y2="432" stroke="#8A6A4A" stroke-opacity="0.18" stroke-width="0.5"/>
+<g transform="translate(50 452)">
 <text class="pos-lbl">{pos_count} POSITIONS</text>
-<g transform="translate(0 14)">{weight_bar}</g>
+<g transform="translate(0 12)">{weight_bar}</g>
 </g>
-<g transform="translate(46 500)">
-<text class="foot">ERC-721 · ON-CHAIN · DETERMINISTIC</text>
+<g transform="translate(40 526)">
+<text class="foot">ERC-721 \u00b7 ON-CHAIN \u00b7 DETERMINISTIC</text>
 </g>
-<circle cx="354" cy="498" r="3.5" fill="{colors["accent"]}" fill-opacity="0.6"/>
+<circle cx="360" cy="523" r="3.5" fill="{colors["accent"]}" fill-opacity="0.75"/>
 </svg>'''
     if len(svg.encode("utf-8")) > _SVG_SIZE_LIMIT:
         raise RuntimeError("generated Policy NFT SVG exceeds size limit")
@@ -381,10 +431,10 @@ def generate_metadata(policy: Policy) -> PolicyNFTMetadataOut:
         )
 
     return PolicyNFTMetadataOut(
-        name=f"Lemma Policy #{policy.id.hex[-8:].upper()}",
+        name=f"xEngine Policy #{policy.id.hex[-8:].upper()}",
         description=(
-            "A privacy-safe on-chain representation of a Lemma prediction-market "
-            "risk policy. Metadata includes product economics only."
+            "A privacy-safe on-chain representation of an xEngine \u5dee\u5206\u673a "
+            "prediction-market risk policy. Metadata includes product economics only."
         ),
         image=image,
         # Prefer the unauthenticated visual landing page. The public metadata

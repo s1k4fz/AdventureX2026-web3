@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 
 import { GlobalContextPanel } from '@/features/policy/GlobalContextPanel'
 import type { PortfolioOut, RiskFactorCategory } from '@/features/policy/policyApi'
+import type { FundPolicyController } from '@/features/policy/useFundPolicy'
 import { OnChainPolicyId, TxLink } from '@/features/wallet/TxLink'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +21,10 @@ export interface ComparisonMatrixProps {
   showGlobalContext?: boolean
   onSelectPortfolio?: (portfolioId: string) => void
   selecting?: boolean
+  /** 阶段层共享的出资状态机（单一进度入口）。 */
+  fundingController?: FundPolicyController
+  /** 不在档位卡内联渲染链上进度。 */
+  hideInlineFundingSteps?: boolean
 }
 
 export function ComparisonMatrix({
@@ -33,6 +38,8 @@ export function ComparisonMatrix({
   showGlobalContext = true,
   onSelectPortfolio,
   selecting,
+  fundingController,
+  hideInlineFundingSteps,
 }: ComparisonMatrixProps) {
   const {
     selectedId,
@@ -124,6 +131,8 @@ export function ComparisonMatrix({
             }
             selecting={selecting}
             showPositionCount={showPositionCount}
+            fundingController={fundingController}
+            hideInlineFundingSteps={hideInlineFundingSteps}
           />
         ))}
       </div>
