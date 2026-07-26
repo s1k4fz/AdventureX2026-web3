@@ -1,0 +1,18 @@
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        // Rokid 官方 Maven 仓库（CXR-L SDK）
+        maven { url 'https://maven.rokid.com/repository/maven-public/' }
+    }
+}
+rootProject.name = "RokidCxrlApp"
+include ':app'

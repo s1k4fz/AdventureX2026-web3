@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="560" viewBox="0 0 400 560" role="img" aria-labelledby="title desc">
+<title id="title">Lemma Policy NFT 12345678</title>
+<desc id="desc">Privacy-safe visualization of public policy economics</desc>
+<defs>
+<linearGradient id="base" x1="0" y1="0" x2="0.5" y2="1">
+<stop offset="0%" stop-color="#F5E8D8"/>
+<stop offset="50%" stop-color="#E8C8B0"/>
+<stop offset="100%" stop-color="#D4A890"/>
+</linearGradient>
+<linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#1A1A2E" stop-opacity="0.88"/>
+<stop offset="100%" stop-color="#0F0F1A" stop-opacity="0.92"/>
+</linearGradient>
+<filter id="blur-bg"><feGaussianBlur stdDeviation="8"/></filter>
+<clipPath id="card-clip"><rect x="20" y="180" width="360" height="360" rx="16"/></clipPath>
+</defs>
+<style>
+.brand{font:900 11px system-ui,sans-serif;letter-spacing:5px;fill:#1A1A2E;fill-opacity:0.7}
+.id{font:400 9px ui-monospace,monospace;letter-spacing:1.5px;fill:#4A3828;fill-opacity:0.6}
+.hero{font:900 48px system-ui,sans-serif;fill:#F8F4F0;letter-spacing:-2px}
+.sub{font:700 11px system-ui,sans-serif;letter-spacing:3px;fill:#C75B2F}
+.lbl{font:600 8px system-ui,sans-serif;letter-spacing:2.5px;fill:#8B9AB0}
+.num{font:800 26px system-ui,sans-serif;fill:#F0EDE8}
+.unit{font:500 10px system-ui,sans-serif;fill:#7A8899}
+.badge{font:700 8px system-ui,sans-serif;letter-spacing:2px;fill:#C75B2F}
+.foot{font:400 7.5px ui-monospace,monospace;letter-spacing:1.2px;fill:#5A6478}
+.pos-lbl{font:600 8px system-ui,sans-serif;letter-spacing:2px;fill:#6B7A8E}
+</style>
+<rect width="400" height="560" rx="24" fill="url(#base)"/>
+<g transform="rotate(-35 200 250)" opacity="0.9"><rect x="-20" y="-100" width="60" height="800" fill="#D4918A" fill-opacity="0.25"/><rect x="40" y="-100" width="90" height="800" fill="#F5E6D0" fill-opacity="0.35"/><rect x="100" y="-100" width="50" height="800" fill="#C08858" fill-opacity="0.2"/><rect x="160" y="-100" width="80" height="800" fill="#E8C0B0" fill-opacity="0.3"/><rect x="240" y="-100" width="45" height="800" fill="#B8963C" fill-opacity="0.15"/><rect x="290" y="-100" width="70" height="800" fill="#F0D4C8" fill-opacity="0.28"/><rect x="350" y="-100" width="55" height="800" fill="#C090B0" fill-opacity="0.18"/><rect x="410" y="-100" width="65" height="800" fill="#E0B888" fill-opacity="0.22"/><rect x="470" y="-100" width="50" height="800" fill="#D4A0A0" fill-opacity="0.2"/></g>
+<g transform="translate(36 50)">
+<text class="brand">LEMMA</text>
+<text x="0" y="18" class="id">12345678</text>
+</g>
+<g transform="translate(364 50)" text-anchor="end">
+<text class="id">POLICY NFT</text>
+<text y="18" class="id">INJECTIVE</text>
+</g>
+<rect x="20" y="180" width="360" height="360" rx="16" fill="url(#glass)"/>
+<rect x="20" y="180" width="360" height="360" rx="16" fill="none" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="1"/>
+<g transform="translate(46 220)">
+<text class="sub">AGGRESSIVE</text>
+<text x="0" y="58" class="hero">ACTIVE</text>
+
+</g>
+<line x1="46" y1="320" x2="354" y2="320" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="0.5"/>
+<g transform="translate(46 348)">
+<text class="lbl">PREMIUM</text>
+<text y="28" class="num">200.00 USDC</text>
+</g>
+<g transform="translate(220 348)">
+<text class="lbl">MAX PAYOUT</text>
+<text y="28" class="num">750.00 USDC</text>
+</g>
+<line x1="46" y1="415" x2="354" y2="415" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="0.5"/>
+<g transform="translate(46 435)">
+<text class="pos-lbl">8 POSITIONS</text>
+<g transform="translate(0 14)"><rect x="0.0" y="0" width="37.5" height="3" rx="1.5" fill="#61E5A1" fill-opacity="0.85"/><rect x="38.5" y="0" width="37.5" height="3" rx="1.5" fill="#72A7FF" fill-opacity="0.4"/><rect x="77.0" y="0" width="37.5" height="3" rx="1.5" fill="#F59B61" fill-opacity="0.85"/><rect x="115.5" y="0" width="37.5" height="3" rx="1.5" fill="#C187FF" fill-opacity="0.4"/><rect x="154.0" y="0" width="37.5" height="3" rx="1.5" fill="#F1D35C" fill-opacity="0.85"/><rect x="192.5" y="0" width="37.5" height="3" rx="1.5" fill="#FF6B9D" fill-opacity="0.4"/><rect x="231.0" y="0" width="37.5" height="3" rx="1.5" fill="#4ECDC4" fill-opacity="0.85"/><rect x="269.5" y="0" width="37.5" height="3" rx="1.5" fill="#A78BFA" fill-opacity="0.4"/></g>
+</g>
+<g transform="translate(46 500)">
+<text class="foot">ERC-721 · ON-CHAIN · DETERMINISTIC</text>
+</g>
+<circle cx="354" cy="498" r="3.5" fill="#C75B2F" fill-opacity="0.6"/>
+</svg>

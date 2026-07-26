@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ===== CXR-L SDK 官方要求（client-l:1.0.3）===== -->
+    <!-- 必需：SDK 网络通信 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- 仅 CUSTOMAPP 会话且从公共存储读取眼镜端 apk 时需要（appUploadAndInstall） -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- ===== 息屏保活（LinkKeepAliveService）===== -->
+    <!-- targetSdk 34 前台服务必须声明总开关 + 具体类型 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- connectedDevice 类型要求持有任一外设类权限；本 App 不直连蓝牙（由 Rokid AI App
+         持有），用普通权限 CHANGE_NETWORK_STATE 满足前置条件 -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <!-- 息屏后 CPU 不休眠，保 HUD SSE 与 CXR 回调持续工作 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Android 13+ 前台服务通知需运行时授权（MainActivity 启动时申请） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 申请忽略电池优化（MainActivity 按钮触发系统弹窗） -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- 开机自启动：重启后 BootReceiver 自动拉起保活服务 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- 说明：
+         1. 蓝牙权限不需要 —— 眼镜连接由 Rokid AI App 持有，本App 不直连眼镜
+         2. 麦克风/相机是眼镜端权限，在授权阶段通过 GlassPermission 申请，非手机运行时权限
+         3. 如需分享本地文件（如 WAV 录音），配置 FileProvider（authority 为 ${applicationId}.fileprovider） -->
+
+    <application
+        android:name=".CxrApplication"
+        android:allowBackup="false"
+        android:label="CXR-L Demo"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:usesCleartextTraffic="true"
+        tools:replace="android:label">
+        <!-- usesCleartextTraffic: 局域网联调 Lemma 后端（明文 http）用；上线切 https 后移除 -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 链路保活前台服务：息屏/后台防冻结 + CXR 自动重连（LinkGuardian） -->
+        <service
+            android:name=".LinkKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!-- 开机自启动：有本地 token 时重启后自动恢复保活与链路 -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

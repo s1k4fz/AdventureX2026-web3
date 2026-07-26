@@ -1,0 +1,17 @@
+# Gradle
+.gradle/
+build/
+app/build/
+
+# Android Studio / IDEA
+.idea/
+*.iml
+local.properties
+captures/
+
+# 签名文件（勿提交仓库）
+*.jks
+*.keystore
+
+# 其他
+.DS_Store

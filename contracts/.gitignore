@@ -1,0 +1,5 @@
+out/
+cache/
+broadcast/
+# Vendored dependency (forge-std) cloned directly, not a submodule
+lib/

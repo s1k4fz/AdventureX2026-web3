@@ -1,0 +1,266 @@
+"""Boundary types <-> framework types. The only bilingual file (终稿 4.2).
+
+Stateless thin functions; nothing here talks to the network or the database.
+"""
+
+from decimal import Decimal, InvalidOperation
+from typing import Any
+
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelResponse,
+    ThinkingPart,
+    ThinkingPartDelta,
+    TextPart,
+    TextPartDelta,
+    UserPromptPart,
+)
+from pydantic_ai.tools import Tool as PydanticTool
+from pydantic_ai.toolsets import FunctionToolset
+from pydantic_ai.usage import RunUsage
+
+from ai.errors import UnsupportedCapabilityError
+from ai.tools.types import ToolBinding, ToolCall, ToolResult, ToolSpec
+from ai.types import ChatMessage, TokenUsage
+
+
+def split_history_and_prompt(
+    messages: list[ChatMessage],
+) -> tuple[list[ModelMessage], str]:
+    """Split boundary messages into framework history + the current user prompt.
+
+    System messages are dropped on purpose: the system prompt is injected via
+    Agent instructions (prompts/registry), so keeping them in the history would
+    send a duplicate system prompt.
+    """
+    if not messages or messages[-1].role != "user":
+        raise ValueError("conversation must end with a user message")
+
+    prompt = _text_content(messages[-1])
+    history: list[ModelMessage] = []
+    for message in messages[:-1]:
+        if message.role == "system":
+            continue
+        text = _text_content(message)
+        if message.role == "user":
+            history.append(ModelRequest(parts=[UserPromptPart(content=text)]))
+        else:
+            history.append(ModelResponse(parts=[TextPart(content=text)]))
+    return history, prompt
+
+
+def _text_content(message: ChatMessage) -> str:
+    if isinstance(message.content, str):
+        return message.content
+    raise UnsupportedCapabilityError(
+        "structured message content is not supported yet (multimodal lands in Phase 2)"
+    )
+
+
+def to_token_usage(run_usage: RunUsage) -> TokenUsage:
+    raw: dict[str, Any] = dict(run_usage.details)
+    if run_usage.cache_read_tokens:
+        raw["cache_read_tokens"] = run_usage.cache_read_tokens
+    if run_usage.cache_write_tokens:
+        raw["cache_write_tokens"] = run_usage.cache_write_tokens
+    reasoning_tokens = _extract_reasoning_tokens(raw)
+    return TokenUsage(
+        input_tokens=run_usage.input_tokens,
+        output_tokens=run_usage.output_tokens,
+        total_tokens=run_usage.total_tokens,
+        reasoning_tokens=reasoning_tokens,
+        raw=raw,
+    )
+
+
+def response_metadata(
+    messages: list[ModelMessage],
+) -> tuple[str | None, str | None]:
+    """(actual_model, provider_response_id) from the last model response.
+
+    After a fallback the routing table no longer knows which model answered;
+    the response metadata is the truth.
+    """
+    for message in reversed(messages):
+        if isinstance(message, ModelResponse):
+            return message.model_name, message.provider_response_id
+    return None, None
+
+
+def extract_reasoning_text(messages: list[ModelMessage]) -> str | None:
+    """ThinkingPart text from the last framework model response.
+
+    pydantic-ai 1.106.0 does not expose `ModelResponse.thinking`; provider
+    reasoning is normalized into ThinkingPart entries inside `parts`.
+    """
+    for message in reversed(messages):
+        if isinstance(message, ModelResponse):
+            _, reasoning_text = response_text_and_reasoning(message)
+            return reasoning_text or None
+    return None
+
+
+def response_text_and_reasoning(response: ModelResponse) -> tuple[str, str]:
+    """Visible text and thinking text from a ModelResponse snapshot.
+
+    Stream snapshots are cumulative. Callers can diff the returned strings
+    without depending on part ordering or provider-specific raw fields.
+    """
+    text_parts: list[str] = []
+    reasoning_parts: list[str] = []
+    for part in response.parts:
+        content = getattr(part, "content", None)
+        if not isinstance(content, str):
+            continue
+        if isinstance(part, TextPart):
+            text_parts.append(content)
+        elif isinstance(part, ThinkingPart):
+            reasoning_parts.append(content)
+    return "".join(text_parts), "".join(reasoning_parts)
+
+
+def stream_response_deltas(
+    response: ModelResponse,
+    *,
+    previous_text: str,
+    previous_reasoning_text: str,
+) -> tuple[str, str, str, str]:
+    """Return (text_delta, reasoning_delta, full_text, full_reasoning_text)."""
+    full_text, full_reasoning_text = response_text_and_reasoning(response)
+    return (
+        _append_only_delta(previous_text, full_text),
+        _append_only_delta(previous_reasoning_text, full_reasoning_text),
+        full_text,
+        full_reasoning_text,
+    )
+
+
+def _append_only_delta(previous: str, current: str) -> str:
+    if current == previous:
+        return ""
+    if current.startswith(previous):
+        return current[len(previous) :]
+    # Providers should stream append-only snapshots. If a provider rewrites a
+    # snapshot, prefer surfacing the current content over silently dropping it.
+    return current
+
+
+def _extract_reasoning_tokens(raw: dict[str, Any]) -> int | None:
+    keys = (
+        "reasoning_tokens",
+        "thoughts_tokens",
+        "thoughts_token_count",
+        "completion_tokens_details.reasoning_tokens",
+    )
+    for key in keys:
+        value = raw.get(key)
+        if isinstance(value, int) and value > 0:
+            return value
+    completion_details = raw.get("completion_tokens_details")
+    if isinstance(completion_details, dict):
+        value = completion_details.get("reasoning_tokens")
+        if isinstance(value, int) and value > 0:
+            return value
+    return None
+
+
+def serialize_turn(messages: list[ModelMessage]) -> dict[str, Any]:
+    """Framework messages -> JSON-safe attachment for ai_messages.raw_parts_json.
+
+    Dual-track storage (终稿第十一章): content_text stays the source of truth;
+    this blob is the optional exact-rebuild attachment. The schema tag lets a
+    future framework swap recognize and migrate (or ignore) old blobs.
+    """
+    return {
+        "schema": "pydantic_ai/v1",
+        "messages": ModelMessagesTypeAdapter.dump_python(messages, mode="json"),
+    }
+
+
+def response_cost_usd(messages: list[ModelMessage]) -> Decimal | None:
+    """Money the platform itself reported for this call, if any.
+
+    Some providers put a `cost` field in provider_details. Platforms that
+    report nothing yield None: the ledger stores NULL, never a guess.
+    """
+    for message in reversed(messages):
+        if isinstance(message, ModelResponse):
+            cost = (message.provider_details or {}).get("cost")
+            if cost is None:
+                return None
+            try:
+                # str() first: Decimal(0.0000319) would inherit float noise.
+                return Decimal(str(cost))
+            except (InvalidOperation, ValueError):
+                return None
+    return None
+
+
+def to_pydantic_toolset(
+    bindings: list[ToolBinding], card_sink: list[dict[str, Any]]
+) -> FunctionToolset:
+    """ToolBindings -> a per-run FunctionToolset (pydantic-ai channel dispatch).
+
+    Each wrapped function drains its handler and returns `response` to the
+    framework (which feeds it back to the model); a `card` payload is pushed
+    into `card_sink` for the client to relay as AIChunk(kind="tool").
+
+    Tool.from_schema skips framework-side argument validation — args reach the
+    handler as-is, which is exactly the contract our handlers already have on
+    the native loop (Pydantic in the service is the verdict).
+    """
+    return FunctionToolset(
+        tools=[_binding_to_pydantic_tool(binding, card_sink) for binding in bindings]
+    )
+
+
+def _binding_to_pydantic_tool(
+    binding: ToolBinding, card_sink: list[dict[str, Any]]
+) -> PydanticTool:
+    spec = binding.spec
+    handler = binding.handler
+
+    async def call_tool(**kwargs: Any) -> dict[str, Any]:
+        result: ToolResult | None = None
+        async for event in handler(ToolCall(name=spec.name, args=kwargs)):
+            if isinstance(event, ToolResult):
+                result = event
+        if result is None:
+            return {"status": "error"}
+        if result.card is not None:
+            card_sink.append(result.card)
+        return result.response
+
+    return PydanticTool.from_schema(
+        call_tool,
+        name=spec.name,
+        description=spec.description,
+        json_schema=spec.parameters or {"type": "object", "properties": {}},
+    )
+
+
+def deltas_from_stream_event(event: Any) -> tuple[str, str]:
+    """(text_delta, reasoning_delta) from one model-request stream event.
+
+    agent.iter() node streams emit PartStartEvent (which may already carry
+    initial content) followed by PartDeltaEvents; both must be counted or the
+    first chunk of a part is silently dropped.
+    """
+    kind = getattr(event, "event_kind", "")
+    if kind == "part_start":
+        part = event.part
+        content = getattr(part, "content", None)
+        if isinstance(part, TextPart) and isinstance(content, str):
+            return content, ""
+        if isinstance(part, ThinkingPart) and isinstance(content, str):
+            return "", content
+    elif kind == "part_delta":
+        delta = event.delta
+        content = getattr(delta, "content_delta", None)
+        if isinstance(delta, TextPartDelta) and isinstance(content, str):
+            return content, ""
+        if isinstance(delta, ThinkingPartDelta) and isinstance(content, str):
+            return "", content
+    return "", ""

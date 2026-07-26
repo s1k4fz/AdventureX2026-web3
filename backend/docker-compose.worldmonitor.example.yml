@@ -1,0 +1,35 @@
+# Example only — do NOT treat this as a full WorldMonitor stack.
+#
+# WorldMonitor is vendored in-repo:
+#   ../../worldmonitor/docker-compose.yml  (+ SELF_HOSTING.md / UPSTREAM.md)
+#
+# lemma-ai only needs the WM HTTP surface. Typical local wiring:
+#
+#   1. Start WM from ./worldmonitor (see root README + ai/worldmonitor/LOCAL.md)
+#   2. Point lemma backend/.env at http://127.0.0.1:17300 (uncommon port)
+#   3. Use a local WORLDMONITOR_VALID_KEYS value (not a cloud wm_ Pro key)
+#
+# Optional: if you later wrap lemma in compose, this fragment shows the env
+# contract for the *minimal* WM stack (redis + redis-rest + worldmonitor only).
+# Do NOT start ais-relay unless you need AIS live feeds (--profile full).
+
+services:
+  lemma-backend:
+    # image / build: use your normal lemma backend service definition
+    environment:
+      # Host WM publishes on uncommon port 17300 (see ai/worldmonitor/LOCAL.md)
+      WORLDMONITOR_API_BASE_URL: "http://host.docker.internal:17300"
+      # Must match WORLDMONITOR_VALID_KEYS inside the WM container
+      WORLDMONITOR_API_KEY: "lemma-local-dev-key"
+      WORLDMONITOR_TIMEOUT_SECONDS: "15"
+      WORLDMONITOR_CACHE_TTL_SECONDS: "120"
+    extra_hosts:
+      # Linux Docker: host.docker.internal is not always present
+      - "host.docker.internal:host-gateway"
+
+# On the WorldMonitor side (docker-compose.override.yml):
+#   - start only: docker compose up -d redis redis-rest worldmonitor
+#   - WORLDMONITOR_VALID_KEYS=lemma-local-dev-key
+#   - ais-relay under profiles: ["full"] (not started by default)
+#   - Redis REST host port 18079; WM HTTP 17300
+# See ai/worldmonitor/LOCAL.md

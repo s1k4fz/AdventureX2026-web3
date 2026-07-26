@@ -1,0 +1,8 @@
+.DS_Store
+/.cursor/
+/docs/
+/task-management/
+/temp/
+/lemma-ai-main/
+# Foundry toolchain installed in-workspace for contract build/test/deploy
+/.foundry/

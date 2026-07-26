@@ -1,0 +1,28 @@
+# lemma-ai minimal local stack — uncommon ports, no ais-relay by default
+#
+# Start (minimal):
+#   docker compose up -d --build redis redis-rest worldmonitor
+# Optional full (needs AISSTREAM_API_KEY):
+#   docker compose --profile full up -d ais-relay
+
+services:
+  worldmonitor:
+    # Drop hard dependency on ais-relay (lemma seeds Redis from the host).
+    depends_on: !override
+      redis-rest:
+        condition: service_started
+    environment:
+      WORLDMONITOR_VALID_KEYS: "lemma-local-dev-key"
+      RELAY_SHARED_SECRET: "${RELAY_SHARED_SECRET}"
+      # Relay unused in minimal mode; keep URL empty so app does not wait on it.
+      WS_RELAY_URL: ""
+
+  # Only start when explicitly requested: --profile full
+  ais-relay:
+    profiles: ["full"]
+    environment:
+      RELAY_SHARED_SECRET: "${RELAY_SHARED_SECRET}"
+
+  redis-rest:
+    ports: !override
+      - "127.0.0.1:${WM_REDIS_REST_PORT:-18079}:80"

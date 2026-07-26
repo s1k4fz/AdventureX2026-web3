@@ -1,0 +1,55 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    // 包名必须与 Rokid 开放平台登记的一致，鉴权通常校验包名+签名
+    namespace 'com.example.rokidcxr'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.example.rokidcxr" // TODO: 替换为开放平台登记的包名
+        minSdk 31   // CXR-L SDK 要求 minSdk ≥ 31（Android 12+）
+        targetSdk 34
+        versionCode 1
+        versionName "0.1.0"
+    }
+
+    // 调试阶段即使用与开放平台登记一致的签名，避免鉴权失败
+    // TODO: 拿到正式 keystore 后在此配置 signingConfigs 并绑定到 buildTypes
+    signingConfigs {
+        // release {
+        //     storeFile file("...")
+        //     storePassword "..."
+        //     keyAlias "..."
+        //     keyPassword "..."
+        // }
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+        }
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // CXR-L SDK（手机端），由 Rokid 公开 Maven 仓库提供
+    implementation 'com.rokid.cxr:client-l:1.0.3'
+    // 注意：不要在手机端工程引入 cxr-service-bridge（那是眼镜端 CXR-S 的包）
+
+    // HUD 卡片流：后端 SSE（GET /api/v1/hud/stream）接收 + JSON 解析（见 backend/HUD.md）
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.okhttp3:okhttp-sse:4.12.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+}

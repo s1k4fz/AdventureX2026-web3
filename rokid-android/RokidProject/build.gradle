@@ -1,0 +1,6 @@
+// 项目级构建配置
+// Android Gradle Plugin 与 Gradle 版本对应关系：
+//   AGP 8.5.x -> Gradle 8.7+，JDK 17
+plugins {
+    id 'com.android.application' version '8.5.2' apply false
+}

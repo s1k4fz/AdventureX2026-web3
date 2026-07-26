@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual environment
+.venv/
+
+# Environment variables (never commit real secrets)
+.env
+
+# Local run artifacts (live scripts, debug dumps)
+artifacts/
